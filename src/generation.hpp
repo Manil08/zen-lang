@@ -217,6 +217,7 @@ public:
 
         IdentVisitor visitor(this, node_ident);
         visit(visitor,node_ident->var);
+
     }
 
     void gen_scope(const NodeScope* scope) {

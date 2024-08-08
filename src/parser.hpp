@@ -157,8 +157,7 @@ public:
             term->var=term_int_lit;
             return term;
         }
-        else if(peek().has_value() && peek().value().type==TokenType::ident)
-        {
+        else if(peek().has_value() && peek().value().type==TokenType::ident) {
             auto* term_ident = m_alloc.alloc<NodeTermIdent>();
             term_ident->ident=consume();
             term->var=term_ident;

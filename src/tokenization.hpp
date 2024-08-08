@@ -15,6 +15,7 @@ struct Token {
 };
 
 optional<int> bin_prec(TokenType type) {
+
     switch (type) {
     case TokenType::plus: return 0;
     case TokenType::minus: return 0;
