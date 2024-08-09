@@ -282,11 +282,12 @@ public:
             }
 
             void operator()(const NodeStmtRep* node_rep) {
+                size_t id=gen->global_id;
                 gen->gen_expr(node_rep->expr);
                 gen->pop("rcx");
-                gen->m_output << "l" << gen->global_id << ":\n";
+                gen->m_output << "l" << id << ":\n";
                 gen->gen_scope(node_rep->stmts);
-                gen->m_output << "loop l" << gen->global_id << "\n";
+                gen->m_output << "loop l" << id << "\n";
                 gen->global_id++;
             }
 
