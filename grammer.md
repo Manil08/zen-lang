@@ -6,6 +6,7 @@
   - `let ident = Expr;`
   - `ident`
   - `if (Expr) Scope`
+  - `else Scope`
   - `Scope`
   - `rep (Expr) Scope`
 - **ident** →
