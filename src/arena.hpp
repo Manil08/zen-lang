@@ -11,11 +11,6 @@ public:
         m_offset=m_buffer;
     }
 
-    // // Using the below two functions to prevent accidental copying of Arena Allocator
-    // inline ArenaAllocator(const ArenaAllocator& other) = delete;
-    //
-    // inline ArenaAllocator operator=(const ArenaAllocator& other) = delete;
-
     template<typename T>
     inline T* alloc() {
         void* offset = m_offset;

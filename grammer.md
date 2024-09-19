@@ -33,4 +33,3 @@
 - **Term** →
   - `int_lit`
   - `ident`
-  - `Expr`
