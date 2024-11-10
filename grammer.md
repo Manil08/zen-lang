@@ -1,21 +1,29 @@
 ### Grammar
 
-- **Prog** → Stmt\*
+- **Prog** →
+  - `Stmt* (Main Function)`
+  - `Functions*`
+- **Function Declaration** →
+  - `ident`
+  - `expr*`
+  - `scope`
 - **Stmt** →
-  - `exit(Expr);`
-  - `let ident = Expr;`
+  - `exit(Expr)`
+  - `let ident = Expr`
   - `ident`
   - `if (Expr) Scope`
   - `Scope`
   - `rep (Expr) Scope`
+  - `return expr`
 - **ident** →
   - `Expr`
   - `ident++`
   - `ident--`
-- **Scope** → Stmt\*
+- **Scope** → 
+  - `Stmt*`
 - **Expr** →
-  - Term
-  - BinExpr
+  - `Term`
+  - `BinExpr`
 - **BinExpr** →
   - `Expr || Expr` (prec = 1)
   - `Expr && Expr` (prec = 2)
@@ -33,3 +41,7 @@
 - **Term** →
   - `int_lit`
   - `ident`
+  - `function calling`
+- **Function Calling** →
+  - `ident`
+  - `expr*`

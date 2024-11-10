@@ -2,20 +2,21 @@
 #include <iostream>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 using namespace std;
 
 enum class TokenType {exit,int_lit,semi,open_paren,close_paren,ident,let,eq,
     plus,minus,star,pow,slash,percent,gt,lt,gte,lte,comp,if_,open_curly_paren,
-    close_curly_paren,else_,and_,or_,rep};
+    close_curly_paren,else_,and_,or_,rep,comma,ret_,func,open_squ_paren,close_squ_paren};
+
 struct Token {
     TokenType type;
     optional<string> value{};
 };
 
 optional<int> bin_prec(TokenType type) {
-
     switch (type) {
     case TokenType::plus: return 0;
     case TokenType::minus: return 0;
@@ -78,6 +79,16 @@ public:
                     buff.clear();
                     continue;
                 }
+                else if(buff=="return"){
+                    tokens.push_back({.type = TokenType::ret_});
+                    buff.clear();
+                    continue;
+                }
+                else if(buff=="function"){
+                    tokens.push_back({.type = TokenType::func});
+                    buff.clear();
+                    continue;
+                }
                 else{
                     tokens.push_back({.type = TokenType::ident, .value = buff});
                     buff.clear();
@@ -123,6 +134,16 @@ public:
             if(m_src.at(ind)==';')
             {
                 tokens.push_back({.type = TokenType::semi});
+                ind++;
+            }
+            else if(m_src.at(ind)=='[')
+            {
+                tokens.push_back({.type = TokenType::open_squ_paren});
+                ind++;
+            }
+            else if(m_src.at(ind)==']')
+            {
+                tokens.push_back({.type = TokenType::close_squ_paren});
                 ind++;
             }
             else if(m_src.at(ind)=='{')
@@ -192,6 +213,11 @@ public:
                     ind++;
                 }
                 else tokens.push_back({.type = TokenType::lt});
+                ind++;
+            }
+            else if(m_src.at(ind)==',')
+            {
+                tokens.push_back({.type = TokenType::comma});
                 ind++;
             }
         }

@@ -18,7 +18,7 @@ public:
 
             void operator()(const NodeTermIdent* term_ident) {
                 const string& ident_name = term_ident->ident.value.value();
-                if(gen->m_vars.find(ident_name)==gen->m_vars.end() ||
+                if(gen->m_vars.find(ident_name) == gen->m_vars.end() ||
                     gen->m_vars[ident_name].stack_loc >= gen->m_stack_size) {
                     gen->throw_exit_failure("Identifier not found : ",ident_name);
                 }
@@ -26,6 +26,29 @@ public:
             }
             void operator()(const NodeTermIntLit* term_int_lit) {
                 gen->m_output << "    mov rax, " << term_int_lit->int_lit.value.value() << "\n";
+                gen->push("rax");
+            }
+            void operator()(const NodeTermFuncCall* func_call) {
+                string name = func_call->ident.value.value();
+                vector<NodeExpr*> para = func_call->parameters;
+
+                if(gen->m_func_names.find(name) == gen->m_func_names.end()) {
+                    gen->throw_exit_failure("Function not found : ",name);
+                }
+                if(gen->m_func_names[name]!=para.size()) {
+                    cerr << "Invalid parameters transferred : Required " << gen->m_func_names[name] << ", Found " << para.size() << endl;
+                    exit(EXIT_FAILURE);
+                }
+
+                unordered_map<string,Var> old_m_vars = gen->m_vars;
+                size_t old_m_stack_size = gen->m_stack_size;
+                for(auto term:para) {
+                    gen->gen_expr(term);
+                }
+
+                gen->m_output << "    call " << name << "\n";
+
+                for(auto term:para) gen->pop("rbx");
                 gen->push("rax");
             }
         };
@@ -281,6 +304,13 @@ public:
                 gen->gen_scope(scope);
             }
 
+            void operator()(const NodeStmtRet* ret) {
+                gen->gen_expr(ret->expr);
+                gen->pop("rax");
+                while(gen->m_stack_size > gen->m_func_cap) gen->pop("rbx");
+                gen->m_output << "    ret\n";
+            }
+
             void operator()(const NodeStmtRep* node_rep) {
                 size_t id=gen->global_id;
                 gen->gen_expr(node_rep->expr);
@@ -298,8 +328,41 @@ public:
 
     }
 
+    void gen_funcdec(const NodeStmtFuncDec* function) {
+        string func_name = function->ident.value.value();
+        vector<Token> parameters = function->parameters;
+        auto scope = function->stmts;
+
+        if(m_func_names.find(func_name) != m_func_names.end()) {
+            throw_exit_failure("Duplicate function declarations for ",func_name);
+        }
+        m_func_names[func_name] = parameters.size();
+        m_output << func_name << ":\n";
+
+        for(auto parameter: parameters) {
+            string para = parameter.value.value();
+            m_vars[para]={.stack_loc = m_stack_size};
+            m_stack_size++;
+        }
+        m_stack_size++;
+        m_func_cap = m_stack_size;
+
+        gen_scope(scope);
+
+        m_stack_size=0;
+        m_vars.clear();
+    }
+
     string gen_prog() {
-        m_output << "global _start\n_start:\n";
+
+        m_output << "global _start\n";
+
+        for(const NodeStmtFuncDec* function: m_prog->functions) {
+            gen_funcdec(function);
+            line_ct++;
+        }
+
+        m_output << "_start:\n";
 
         for(const NodeStmt* stmt: m_prog->stmts) {
             gen_stmt(stmt);
@@ -341,7 +404,7 @@ private:
 
     string pointer_loc(const string& ident) {
         size_t loc = (m_vars[ident]).stack_loc;
-        string pointer_location = "QWORD [rsp + " + (to_string((m_stack_size - loc - 1)*8)) + "]";
+        string pointer_location = "QWORD [rsp + " + (to_string((m_stack_size - 1 - loc)*8)) + "]";
         return pointer_location;
     }
 
@@ -352,8 +415,11 @@ private:
 
     stringstream m_output;
     const NodeProg* m_prog;
+    size_t m_func_cap;
+    unordered_map<string,Var> m_vars;
+    unordered_map<string,size_t> m_func_names;
+
     size_t m_stack_size = 0;
     size_t line_ct = 1;
     size_t global_id = 0;
-    unordered_map<string,Var> m_vars = {};
 };

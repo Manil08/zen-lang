@@ -1,6 +1,5 @@
 #pragma once
 #include <cmath>
-
 #include "tokenization.hpp"
 #include "arena.hpp"
 #include <variant>
@@ -14,8 +13,15 @@ struct NodeTermIdent {
     Token ident;
 };
 
+struct NodeExpr;
+
+struct NodeTermFuncCall {
+    Token ident;
+    vector<NodeExpr*> parameters;
+};
+
 struct NodeTerm {
-    variant<NodeTermIdent*,NodeTermIntLit*> var;
+    variant<NodeTermIdent*,NodeTermIntLit*,NodeTermFuncCall*> var;
 };
 
 struct NodeExpr;
@@ -132,12 +138,23 @@ struct NodeStmtRep {
     NodeScope* stmts;
 };
 
+struct NodeStmtRet {
+    NodeExpr* expr;
+};
+
+struct NodeStmtFuncDec {
+    Token ident;
+    vector<Token> parameters;
+    NodeScope* stmts;
+};
+
 struct NodeStmt {
-    variant<NodeStmtExit*,NodeStmtLet*,NodeStmtIdent*,NodeStmtIf*,NodeScope*,NodeStmtRep*> var;
+    variant<NodeStmtExit*,NodeStmtLet*,NodeStmtIdent*,NodeStmtIf*,NodeScope*,NodeStmtRep*,NodeStmtRet*> var;
 };
 
 struct NodeProg {
     vector<NodeStmt*> stmts;
+    vector<NodeStmtFuncDec*> functions;
 };
 
 class Parser{
@@ -157,11 +174,24 @@ public:
             term->var=term_int_lit;
             return term;
         }
-        else if(peek().has_value() && peek().value().type==TokenType::ident) {
-            auto* term_ident = m_alloc.alloc<NodeTermIdent>();
-            term_ident->ident=consume();
-            term->var=term_ident;
-            return term;
+        else if(peek().has_value() && peek().value().type==TokenType::ident)
+        {
+            Token ident = consume();
+            if(peek().has_value() && peek().value().type == TokenType::open_squ_paren) {
+                auto node_func_call = m_alloc.alloc<NodeTermFuncCall>();
+                node_func_call->ident = ident;
+                if(auto parameters = parse_para()) {
+                    node_func_call->parameters = parameters.value();
+                }
+                term->var = node_func_call;
+                return term;
+            }
+            else {
+                auto* term_ident = m_alloc.alloc<NodeTermIdent>();
+                term_ident->ident=ident;
+                term->var=term_ident;
+                return term;
+            }
         }
         else return {};
     }
@@ -462,20 +492,71 @@ public:
         return node_rep;
     }
 
+    optional<vector<NodeExpr*>> parse_para() {
+        if(peek().has_value()&&peek().value().type==TokenType::open_squ_paren) consume();
+        else throw_exit_failure("Invalid function calling");
+        vector<NodeExpr*> terms;
+        if(auto term = parse_expr(0)) terms.push_back(term.value());
+        else throw_exit_failure("Invalid function calling (weird arguments)");
+        while(peek().has_value()&&peek().value().type == TokenType::comma) {
+            consume();
+            if(auto term = parse_expr(0)) terms.push_back(term.value());
+            else throw_exit_failure("Invalid function calling (weird arguments)");
+        }
+        if(peek().has_value()&&peek().value().type==TokenType::close_squ_paren) consume();
+        else throw_exit_failure("Invalid function calling");
+        return terms;
+    }
+
+    optional<vector<Token>> parse_tokens() {
+        vector<Token> terms;
+        if(peek().has_value()&&peek().value().type==TokenType::open_squ_paren) consume();
+        else throw_exit_failure("Invalid function declaration");
+        if(peek().has_value() && peek().value().type == TokenType::ident) terms.push_back(consume());
+        else throw_exit_failure("Invalid function declaration");
+        while(peek().has_value()&&peek().value().type == TokenType::comma) {
+            consume();
+            if(peek().has_value() && peek().value().type == TokenType::ident) terms.push_back(consume());
+            else throw_exit_failure("Invalid function declaration");
+        }
+        if(peek().has_value()&&peek().value().type==TokenType::close_squ_paren) consume();
+        else throw_exit_failure("Invalid function declaration");
+        return terms;
+    }
+
+    optional<NodeStmtFuncDec*> parse_func_dec() {
+        auto node_func_dec = m_alloc.alloc<NodeStmtFuncDec>();
+
+        if(peek().has_value() && peek().value().type == TokenType::ident) node_func_dec->ident = consume();
+        else throw_exit_failure("Invalid function declaration");
+
+        if(auto parameters = parse_tokens()) {
+            node_func_dec->parameters = parameters.value();
+        }
+
+        if(auto scope = parse_scope()) {
+            node_func_dec->stmts=scope.value();
+        }
+        return node_func_dec;
+    }
+
     optional<NodeStmt*> parse_stmt()
     {
         auto stmt = m_alloc.alloc<NodeStmt>();
         bool stmt_empty = true;
-        if(peek().value().type == TokenType::open_curly_paren) {
-            if(auto scope_node = parse_scope()) {
-                stmt->var = scope_node.value();
-                stmt_empty = false;
-            }
-        }
-        else if(peek().value().type == TokenType::exit) {
+        if(peek().value().type == TokenType::exit) {
             consume();
             if(auto node_exit=parse_exit()){
                 stmt->var = node_exit.value();
+                stmt_empty = false;
+            }
+        }
+        else if(peek().value().type == TokenType::ret_) {
+            consume();
+            auto node_ret = m_alloc.alloc<NodeStmtRet>();
+            if(auto node_expr=parse_expr(0)){
+                node_ret->expr = node_expr.value();
+                stmt->var = node_ret;
                 stmt_empty = false;
             }
         }
@@ -508,6 +589,13 @@ public:
             }
             else throw_exit_failure("Unable to parse if statement!");
         }
+        if(peek().value().type == TokenType::open_curly_paren) {
+            if(auto scope_node = parse_scope()) {
+                stmt->var = scope_node.value();
+                stmt_empty = false;
+            }
+        }
+
         if(bracket_Ct != 0) {
             throw_exit_failure("Invalid expression : Invalid Parenthesis");
         }
@@ -530,7 +618,13 @@ public:
     optional<NodeProg*> parse() {
         auto prog = m_alloc.alloc<NodeProg>();
         while(peek().has_value()) {
-            if(auto stmt_node = parse_stmt()){
+            if(peek().value().type == TokenType::func) {
+                consume();
+                if(auto node_func_dec = parse_func_dec()) {
+                    prog->functions.push_back(node_func_dec.value());
+                }
+            }
+            else if(auto stmt_node = parse_stmt()){
                 prog->stmts.push_back(stmt_node.value());
             }
         }
