@@ -9,6 +9,7 @@ Zen is a beginner-friendly programming language designed for simplicity and ease
 - Limited functionality ideal for beginners
 - Includes efficient operator precedence algorithms,
 - Includes loops, if/else statements, efficient variable handling and error handling
+- Can do multi depth function calling and recursions
 
 ## References
 
